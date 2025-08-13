@@ -13,17 +13,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = cfg.SetUser("shotgun45")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error setting user: %v\n", err)
+	s := &state{cfg: &cfg}
+	cmds := &commands{handlers: make(map[string]func(*state, command) error)}
+	cmds.register("login", handlerLogin)
+
+	if len(os.Args) < 2 {
+		fmt.Fprintf(os.Stderr, "Not enough arguments. Usage: gator <command> [args...]\n")
 		os.Exit(1)
 	}
 
-	cfg, err = config.Read()
+	cmdName := os.Args[1]
+	cmdArgs := os.Args[2:]
+	cmd := command{name: cmdName, args: cmdArgs}
+
+	err = cmds.run(s, cmd)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	fmt.Printf("Config: %+v\n", cfg)
 }
