@@ -1,6 +1,7 @@
 package main
 
 import (
+	cmds "aggreGATOR/internal/commands"
 	"aggreGATOR/internal/config"
 	"aggreGATOR/internal/database"
 	"database/sql"
@@ -24,13 +25,9 @@ func main() {
 	}
 
 	dbQueries := database.New(db)
-	s := &state{db: dbQueries, cfg: &cfg}
 
-	cmds := &commands{handlers: make(map[string]func(*state, command) error)}
-	cmds.register("login", handlerLogin)
-	cmds.register("register", handlerRegister)
-	cmds.register("reset", handlerReset)
-	cmds.register("users", handlerUsers)
+	state := &cmds.State{Db: dbQueries, Cfg: &cfg}
+	commandSet := cmds.DefaultCommands()
 
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "Not enough arguments. Usage: gator <command> [args...]\n")
@@ -39,9 +36,9 @@ func main() {
 
 	cmdName := os.Args[1]
 	cmdArgs := os.Args[2:]
-	cmd := command{name: cmdName, args: cmdArgs}
+	cmd := cmds.Command{Name: cmdName, Args: cmdArgs}
 
-	err = cmds.run(s, cmd)
+	err = commandSet.Run(state, cmd)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
