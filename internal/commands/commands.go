@@ -39,19 +39,19 @@ func (c *Commands) Register(name string, f func(*State, Command) error) {
 
 func DefaultCommands() *Commands {
 	cmds := &Commands{Handlers: make(map[string]func(*State, Command) error)}
-	cmds.Register("login", HandlerLogin)
-	cmds.Register("register", HandlerRegister)
-	cmds.Register("reset", HandlerReset)
-	cmds.Register("users", HandlerUsers)
-	cmds.Register("agg", HandlerAgg)
-	cmds.Register("addfeed", HandlerAddFeed)
-	cmds.Register("feeds", HandlerFeeds)
-	cmds.Register("follow", HandlerFollow)
-	cmds.Register("following", HandlerFollowing)
+	cmds.Register("agg", handlerAgg)
+	cmds.Register("addfeed", middlewareLoggedIn(handlerAddFeed))
+	cmds.Register("feeds", handlerFeeds)
+	cmds.Register("follow", middlewareLoggedIn(handlerFollow))
+	cmds.Register("following", middlewareLoggedIn(handlerFollowing))
+	cmds.Register("login", handlerLogin)
+	cmds.Register("reset", handlerReset)
+	cmds.Register("users", handlerUsers)
+	cmds.Register("register", handlerRegister)
 	return cmds
 }
 
-func HandlerLogin(s *State, cmd Command) error {
+func handlerLogin(s *State, cmd Command) error {
 	if len(cmd.Args) < 1 {
 		return fmt.Errorf("login requires a username argument")
 	}
@@ -68,7 +68,7 @@ func HandlerLogin(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerRegister(s *State, cmd Command) error {
+func handlerRegister(s *State, cmd Command) error {
 	if len(cmd.Args) < 1 {
 		return fmt.Errorf("register requires a username argument")
 	}
@@ -99,7 +99,7 @@ func HandlerRegister(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerReset(s *State, cmd Command) error {
+func handlerReset(s *State, cmd Command) error {
 	err := s.Db.DeleteUsers(context.Background())
 	if err != nil {
 		return fmt.Errorf("reset failed: %v", err)
@@ -108,7 +108,7 @@ func HandlerReset(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerUsers(s *State, cmd Command) error {
+func handlerUsers(s *State, cmd Command) error {
 	users, err := s.Db.GetUsers(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to get users: %v", err)
@@ -124,7 +124,7 @@ func HandlerUsers(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerAgg(s *State, cmd Command) error {
+func handlerAgg(s *State, cmd Command) error {
 	ctx := context.Background()
 	feed, err := rssfeed.FetchFeed(ctx, "https://www.wagslane.dev/index.xml")
 	if err != nil {
@@ -134,17 +134,12 @@ func HandlerAgg(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerAddFeed(s *State, cmd Command) error {
+func handlerAddFeed(s *State, cmd Command, user database.User) error {
 	if len(cmd.Args) < 2 {
 		return fmt.Errorf("addfeed requires name and url arguments")
 	}
 	name := cmd.Args[0]
 	url := cmd.Args[1]
-	userName := s.Cfg.CurrentUserName
-	user, err := s.Db.GetUser(context.Background(), userName)
-	if err != nil {
-		return fmt.Errorf("could not find current user: %v", err)
-	}
 	params := database.CreateFeedParams{
 		Name:   name,
 		Url:    url,
@@ -172,7 +167,7 @@ func HandlerAddFeed(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerFeeds(s *State, cmd Command) error {
+func handlerFeeds(s *State, cmd Command) error {
 	feeds, err := s.Db.GetFeedsWithUser(context.Background())
 	if err != nil {
 		return err
@@ -185,7 +180,7 @@ func HandlerFeeds(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerFollow(s *State, cmd Command) error {
+func handlerFollow(s *State, cmd Command, user database.User) error {
 	if len(cmd.Args) < 1 {
 		return fmt.Errorf("follow requires a feed url argument")
 	}
@@ -193,11 +188,6 @@ func HandlerFollow(s *State, cmd Command) error {
 	feed, err := s.Db.GetFeedByUrl(context.Background(), url)
 	if err != nil {
 		return fmt.Errorf("could not find feed with url %s: %v", url, err)
-	}
-	userName := s.Cfg.CurrentUserName
-	user, err := s.Db.GetUser(context.Background(), userName)
-	if err != nil {
-		return fmt.Errorf("could not find current user: %v", err)
 	}
 	id := uuid.New()
 	now := time.Now()
@@ -215,12 +205,7 @@ func HandlerFollow(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerFollowing(s *State, cmd Command) error {
-	userName := s.Cfg.CurrentUserName
-	user, err := s.Db.GetUser(context.Background(), userName)
-	if err != nil {
-		return fmt.Errorf("could not find current user: %v", err)
-	}
+func handlerFollowing(s *State, cmd Command, user database.User) error {
 	follows, err := s.Db.GetFeedFollowsForUser(context.Background(), user.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get feed follows: %v", err)
@@ -234,4 +219,15 @@ func HandlerFollowing(s *State, cmd Command) error {
 		fmt.Printf("* %s\n", f.FeedName)
 	}
 	return nil
+}
+
+func middlewareLoggedIn(handler func(s *State, cmd Command, user database.User) error) func(*State, Command) error {
+	return func(s *State, cmd Command) error {
+		userName := s.Cfg.CurrentUserName
+		user, err := s.Db.GetUser(context.Background(), userName)
+		if err != nil {
+			return fmt.Errorf("could not find current user: %v", err)
+		}
+		return handler(s, cmd, user)
+	}
 }
