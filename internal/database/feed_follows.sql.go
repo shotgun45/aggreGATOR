@@ -70,39 +70,6 @@ func (q *Queries) CreateFeedFollow(ctx context.Context, arg CreateFeedFollowPara
 	return i, err
 }
 
-const getFeedFollowWithNames = `-- name: GetFeedFollowWithNames :one
-SELECT ff.id, ff.created_at, ff.updated_at, ff.user_id, ff.feed_id, u.name AS user_name, f.name AS feed_name
-FROM feed_follows ff
-JOIN users u ON ff.user_id = u.id
-JOIN feeds f ON ff.feed_id = f.id
-WHERE ff.id = $1
-`
-
-type GetFeedFollowWithNamesRow struct {
-	ID        uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	UserID    uuid.UUID
-	FeedID    uuid.UUID
-	UserName  string
-	FeedName  string
-}
-
-func (q *Queries) GetFeedFollowWithNames(ctx context.Context, id uuid.UUID) (GetFeedFollowWithNamesRow, error) {
-	row := q.db.QueryRowContext(ctx, getFeedFollowWithNames, id)
-	var i GetFeedFollowWithNamesRow
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.UserID,
-		&i.FeedID,
-		&i.UserName,
-		&i.FeedName,
-	)
-	return i, err
-}
-
 const getFeedFollowsForUser = `-- name: GetFeedFollowsForUser :many
 SELECT
     ff.id,
