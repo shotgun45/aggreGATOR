@@ -3,6 +3,7 @@ package commands
 import (
 	"aggreGATOR/internal/config"
 	"aggreGATOR/internal/database"
+	"aggreGATOR/internal/rssfeed"
 	"context"
 	"fmt"
 	"time"
@@ -42,6 +43,7 @@ func DefaultCommands() *Commands {
 	cmds.Register("register", HandlerRegister)
 	cmds.Register("reset", HandlerReset)
 	cmds.Register("users", HandlerUsers)
+	cmds.Register("agg", HandlerAgg)
 	return cmds
 }
 
@@ -115,5 +117,15 @@ func HandlerUsers(s *State, cmd Command) error {
 			fmt.Printf("* %s\n", u.Name)
 		}
 	}
+	return nil
+}
+
+func HandlerAgg(s *State, cmd Command) error {
+	ctx := context.Background()
+	feed, err := rssfeed.FetchFeed(ctx, "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return fmt.Errorf("failed to fetch feed: %v", err)
+	}
+	fmt.Printf("%+v\n", feed)
 	return nil
 }
