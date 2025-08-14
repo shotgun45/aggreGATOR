@@ -44,6 +44,7 @@ func DefaultCommands() *Commands {
 	cmds.Register("reset", HandlerReset)
 	cmds.Register("users", HandlerUsers)
 	cmds.Register("agg", HandlerAgg)
+	cmds.Register("addfeed", HandlerAddFeed)
 	return cmds
 }
 
@@ -127,5 +128,29 @@ func HandlerAgg(s *State, cmd Command) error {
 		return fmt.Errorf("failed to fetch feed: %v", err)
 	}
 	fmt.Printf("%+v\n", feed)
+	return nil
+}
+
+func HandlerAddFeed(s *State, cmd Command) error {
+	if len(cmd.Args) < 2 {
+		return fmt.Errorf("addfeed requires name and url arguments")
+	}
+	name := cmd.Args[0]
+	url := cmd.Args[1]
+	userName := s.Cfg.CurrentUserName
+	user, err := s.Db.GetUser(context.Background(), userName)
+	if err != nil {
+		return fmt.Errorf("could not find current user: %v", err)
+	}
+	params := database.CreateFeedParams{
+		Name:   name,
+		Url:    url,
+		UserID: user.ID,
+	}
+	feed, err := s.Db.CreateFeed(context.Background(), params)
+	if err != nil {
+		return fmt.Errorf("failed to create feed: %v", err)
+	}
+	fmt.Printf("Feed created: ID=%v Name=%s Url=%s UserID=%v\n", feed.ID, feed.Name, feed.Url, feed.UserID)
 	return nil
 }
