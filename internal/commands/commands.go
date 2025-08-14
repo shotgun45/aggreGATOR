@@ -45,6 +45,7 @@ func DefaultCommands() *Commands {
 	cmds.Register("users", HandlerUsers)
 	cmds.Register("agg", HandlerAgg)
 	cmds.Register("addfeed", HandlerAddFeed)
+	cmds.Register("feeds", HandlerFeeds)
 	return cmds
 }
 
@@ -152,5 +153,18 @@ func HandlerAddFeed(s *State, cmd Command) error {
 		return fmt.Errorf("failed to create feed: %v", err)
 	}
 	fmt.Printf("Feed created: ID=%v Name=%s Url=%s UserID=%v\n", feed.ID, feed.Name, feed.Url, feed.UserID)
+	return nil
+}
+
+func HandlerFeeds(s *State, cmd Command) error {
+	feeds, err := s.Db.GetFeedsWithUser(context.Background())
+	if err != nil {
+		return err
+	}
+
+	for _, feed := range feeds {
+		fmt.Printf("- %s\n  url: %s\n  created by: %s\n", feed.Name, feed.Url, feed.UserName)
+	}
+
 	return nil
 }

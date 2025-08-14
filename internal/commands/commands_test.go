@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -31,5 +32,33 @@ func TestRunUnknownCommand(t *testing.T) {
 	cmd := Command{Name: "unknown", Args: []string{}}
 	if err := cmds.Run(state, cmd); err == nil {
 		t.Error("expected error for unknown command, got nil")
+	}
+}
+
+func TestHandlerReturnsError(t *testing.T) {
+	cmds := &Commands{Handlers: make(map[string]func(*State, Command) error)}
+	handler := func(s *State, c Command) error {
+		return errors.New("handler error")
+	}
+	cmds.Register("fail", handler)
+	state := &State{}
+	cmd := Command{Name: "fail", Args: []string{}}
+	if err := cmds.Run(state, cmd); err == nil {
+		t.Error("expected error from handler, got nil")
+	}
+}
+
+func TestMultipleCommandRegistration(t *testing.T) {
+	cmds := &Commands{Handlers: make(map[string]func(*State, Command) error)}
+	calls := make(map[string]bool)
+	cmds.Register("one", func(s *State, c Command) error { calls["one"] = true; return nil })
+	cmds.Register("two", func(s *State, c Command) error { calls["two"] = true; return nil })
+	state := &State{}
+	cmd1 := Command{Name: "one", Args: []string{}}
+	cmd2 := Command{Name: "two", Args: []string{}}
+	cmds.Run(state, cmd1)
+	cmds.Run(state, cmd2)
+	if !calls["one"] || !calls["two"] {
+		t.Error("not all handlers were called")
 	}
 }
