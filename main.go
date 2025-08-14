@@ -2,6 +2,8 @@ package main
 
 import (
 	"aggreGATOR/internal/config"
+	"aggreGATOR/internal/database"
+	"database/sql"
 	"fmt"
 	"os"
 
@@ -15,9 +17,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	s := &state{cfg: &cfg}
+	db, err := sql.Open("postgres", cfg.DBUrl)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
+		os.Exit(1)
+	}
+
+	dbQueries := database.New(db)
+	s := &state{db: dbQueries, cfg: &cfg}
+
 	cmds := &commands{handlers: make(map[string]func(*state, command) error)}
 	cmds.register("login", handlerLogin)
+	cmds.register("register", handlerRegister)
 
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "Not enough arguments. Usage: gator <command> [args...]\n")
