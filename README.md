@@ -54,14 +54,6 @@ Or, if you built the binary:
 - `browse [limit]`: Show recent posts for the current user (default limit is 2).
 - `agg <duration>`: Start periodic aggregation (e.g., `agg 1m`).
 
-## Tracking Changes
-All changes should be tracked with Git. Commit regularly:
-
-```
-git add .
-git commit -m "your message"
-```
-
 ## Notes
 - Make sure your PostgreSQL server is running and accessible.
 - The CLI will create and migrate the database tables automatically if configured.
