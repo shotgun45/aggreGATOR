@@ -48,6 +48,7 @@ func DefaultCommands() *Commands {
 	cmds.Register("reset", handlerReset)
 	cmds.Register("users", handlerUsers)
 	cmds.Register("register", handlerRegister)
+	cmds.Register("unfollow", middlewareLoggedIn(handlerUnfollow))
 	return cmds
 }
 
@@ -218,6 +219,27 @@ func handlerFollowing(s *State, cmd Command, user database.User) error {
 	for _, f := range follows {
 		fmt.Printf("* %s\n", f.FeedName)
 	}
+	return nil
+}
+
+func handlerUnfollow(s *State, cmd Command, user database.User) error {
+	if len(cmd.Args) < 1 {
+		return fmt.Errorf("unfollow requires a feed url argument")
+	}
+	url := cmd.Args[0]
+	feed, err := s.Db.GetFeedByUrl(context.Background(), url)
+	if err != nil {
+		return fmt.Errorf("could not find feed with url %s: %v", url, err)
+	}
+	params := database.DeleteFeedFollowByUserAndUrlParams{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	err = s.Db.DeleteFeedFollowByUserAndUrl(context.Background(), params)
+	if err != nil {
+		return fmt.Errorf("failed to unfollow feed: %v", err)
+	}
+	fmt.Printf("User '%s' unfollowed feed with url '%s'\n", user.Name, url)
 	return nil
 }
 
