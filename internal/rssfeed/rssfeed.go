@@ -21,6 +21,10 @@ type RSSChannel struct {
 type RSSItem struct {
 	Title       string `xml:"title"`
 	Description string `xml:"description"`
+	Link        string `xml:"link"`
+	Guid        string `xml:"guid"`
+	PublishedAt string `xml:"published"`
+	PubDate     string `xml:"pubDate"`
 }
 
 func FetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {

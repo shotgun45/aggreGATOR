@@ -5,6 +5,7 @@ import (
 	"aggreGATOR/internal/database"
 	"aggreGATOR/internal/rssfeed"
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -49,6 +50,7 @@ func DefaultCommands() *Commands {
 	cmds.Register("users", handlerUsers)
 	cmds.Register("register", handlerRegister)
 	cmds.Register("unfollow", middlewareLoggedIn(handlerUnfollow))
+	cmds.Register("browse", middlewareLoggedIn(handlerBrowse))
 	return cmds
 }
 
@@ -156,7 +158,30 @@ func scrapeFeeds(s *State) {
 	}
 	fmt.Printf("Feed: %s\n", feed.Name)
 	for _, item := range rss.Channel.Items {
-		fmt.Printf("  - %s\n", item.Title)
+		id := uuid.New()
+		now := time.Now()
+		url := item.Link
+		if url == "" {
+			url = item.Guid
+		}
+		publishedAt := now // TODO: parse from item.PublishedAt or item.PubDate
+		params := database.CreatePostParams{
+			ID:          id,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+			Title:       item.Title,
+			Url:         url,
+			Description: sql.NullString{String: item.Description, Valid: item.Description != ""},
+			PublishedAt: publishedAt,
+			FeedID:      feed.ID,
+		}
+		_, err := s.Db.CreatePost(context.Background(), params)
+		if err != nil {
+			if err.Error() == "ERROR: duplicate key value violates unique constraint \"posts_url_key\" (SQLSTATE 23505)" {
+				continue
+			}
+			fmt.Printf("Error saving post '%s': %v\n", item.Title, err)
+		}
 	}
 }
 
@@ -277,4 +302,36 @@ func middlewareLoggedIn(handler func(s *State, cmd Command, user database.User) 
 		}
 		return handler(s, cmd, user)
 	}
+}
+
+// browse command: prints recent posts for the current user, with optional limit
+func handlerBrowse(s *State, cmd Command, user database.User) error {
+	limit := 2
+	if len(cmd.Args) > 0 {
+		var l int
+		_, err := fmt.Sscanf(cmd.Args[0], "%d", &l)
+		if err == nil && l > 0 {
+			limit = l
+		}
+	}
+	params := database.GetPostsForUserParams{
+		UserID: user.ID,
+		Limit:  int32(limit),
+	}
+	posts, err := s.Db.GetPostsForUser(context.Background(), params)
+	if err != nil {
+		return fmt.Errorf("failed to get posts: %v", err)
+	}
+	if len(posts) == 0 {
+		fmt.Println("No posts found.")
+		return nil
+	}
+	for _, post := range posts {
+		desc := ""
+		if post.Description.Valid {
+			desc = post.Description.String
+		}
+		fmt.Printf("Title: %s\nURL: %s\nPublished: %s\nDescription: %s\n---\n", post.Title, post.Url, post.PublishedAt.Format(time.RFC3339), desc)
+	}
+	return nil
 }
